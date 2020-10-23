@@ -1,0 +1,102 @@
+funcs:
+  funcs:
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - exp:
+            globid: getargf
+            name: funccall
+            params:
+              exps:
+              - name: lit
+                type: int
+                value: 0
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: float
+            var: a
+        - exp:
+            globid: getargf
+            name: funccall
+            params:
+              exps:
+              - name: lit
+                type: int
+                value: 1
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: float
+            var: b
+        - exp:
+            globid: getargf
+            name: funccall
+            params:
+              exps:
+              - name: lit
+                type: int
+                value: 2
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: float
+            var: c
+        - exp:
+            name: slit
+            type: slit
+            value: 'initial:'
+          name: print
+        - exp:
+            name: varval
+            var: a
+          name: print
+        - exp:
+            name: varval
+            var: b
+          name: print
+        - exp:
+            name: varval
+            var: c
+          name: print
+        - exp:
+            globid: test1
+            name: funccall
+            params:
+              exps:
+              - name: varval
+                var: a
+              - name: varval
+                var: b
+              - name: varval
+                var: c
+          name: expstmt
+        - exp:
+            name: slit
+            type: slit
+            value: 'final:'
+          name: print
+        - exp:
+            name: varval
+            var: a
+          name: print
+        - exp:
+            name: varval
+            var: b
+          name: print
+        - exp:
+            name: varval
+            var: c
+          name: print
+        - exp:
+            name: lit
+            type: int
+            value: 0
+          name: ret
+      name: blk
+    globid: run
+    name: func
+    ret_type: int
+  name: funcs
+name: prog
