@@ -1,0 +1,27 @@
+funcs:
+  funcs:
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - exp:
+            name: lit
+            type: int
+            value: 1
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: int
+            var: a
+      name: blk
+    globid: fib
+    name: func
+    ret_type: int
+    vdecls:
+      name: vdecls
+      vars:
+      - node: vdecl
+        type: int
+        var: n
+  name: funcs
+name: prog

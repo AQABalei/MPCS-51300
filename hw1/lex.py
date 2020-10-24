@@ -43,6 +43,8 @@ tokens = [
    'RParen',
    'LBracket',
    'RBracket',
+   'LSquareBracket',
+   'RSquareBracket',
    'COMMA',
 
    'newline',
@@ -72,6 +74,8 @@ t_LParen  = r'\('
 t_RParen  = r'\)'
 t_LBracket = r'{'
 t_RBracket = r'}'
+t_LSquareBracket = r'\['
+t_RSquareBracket = r'\]'
 t_COMMA = r','
 
 t_Semicolon = r';'
@@ -306,7 +310,8 @@ def p_binop(p):
            | exp lessThan exp
            | exp greaterThan exp
            | exp logicalAnd exp
-           | exp logicalOr exp'''
+           | exp logicalOr exp
+           | [type] exp'''
   if p[2] == '*':
     p[0] = {"name": binop, "lhs": p[1], "op": 'mul', "rhs": p[3]}
   elif p[2] == '/':

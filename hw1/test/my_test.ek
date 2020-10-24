@@ -1,0 +1,3 @@
+def int fib (int $n) {
+    int $a = 1;
+}
