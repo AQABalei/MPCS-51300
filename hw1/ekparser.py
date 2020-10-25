@@ -332,7 +332,7 @@ def p_vdecl(p):
 
 # Error
 def p_error(p):
-    print("Syntax error in input!")
+    print("error: Syntax error in input!")
 
 
 # Helper functions
