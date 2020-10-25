@@ -17,7 +17,7 @@ if __name__== "__main__":
   ast = ekparser.getAst(source_code)
 
   if not ast:
-      raise RuntimeError('AST parsing failure')
+      raise RuntimeError('error: AST parsing failure')
       sys.exit(-1)
   
   if args.boolean_emit_ast:
