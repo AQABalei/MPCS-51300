@@ -1,5 +1,0 @@
-Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
-Collecting ply
-  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/a3/58/35da89ee790598a0700ea49b2a66594140f44dec458c07e8e3d4979137fc/ply-3.11-py2.py3-none-any.whl (49 kB)
-Installing collected packages: ply
-Successfully installed ply-3.11
