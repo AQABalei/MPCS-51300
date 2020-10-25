@@ -3,6 +3,8 @@ from strings import *
 from eklexer import tokens
 
 precedence = (
+  ('nonassoc', 'IF'),
+  ('nonassoc', 'ELSE'),
   ('right', 'ASSIGN'),
   ('left', 'OR'),
   ('left', 'AND'),
@@ -10,7 +12,7 @@ precedence = (
   ('left', 'LT', 'GT'),
   ('left', 'PLUS', 'MINUS'),
   ('left','TIMES','DIVIDE'),
-  ('left','UOP'),
+  ('right','UOP', 'TYPECAST'),
 )
 
 # <prog> ::= ​<extern>​* ​<func>​+
@@ -118,7 +120,7 @@ def p_while(p):
    p[0] = {name: whileStmt, cond: p[3], stmt: p[5]}
 
 def p_if(p):
-  '''stmt : IF LPAREN exp RPAREN stmt
+  '''stmt : IF LPAREN exp RPAREN stmt %prec IF
           | IF LPAREN exp RPAREN stmt ELSE stmt'''
   if len(p) == 6:
     p[0] = {name: ifStmt, cond: p[3], stmt: p[5]}
@@ -188,7 +190,7 @@ def p_binop(p):
   '''binop : arithOps
            | logicOps
            | varid ASSIGN exp
-           | LBRACKET TYPE RBRACKET exp'''
+           | LBRACKET TYPE RBRACKET exp %prec TYPECAST'''
   if len(p) == 2:
     p[0] = p[1]
   elif len(p) == 4:
@@ -243,9 +245,9 @@ def p_logicOps(p):
 #       | - ​<exp>    ​# signed negation 
 def p_uop(p):
   '''uop : MINUS exp %prec UOP
-          | NOT exp %prec UOP'''
+         | NOT exp %prec UOP'''
   if p[1] == "-":
-    p[0] = {"name" : uop, op: "minus", "exp": p[2] }
+    p[0] = {"name" : uop, op: "uminus", "exp": p[2] }
   else:
     p[0] = {"name" : uop, op: "not", "exp": p[2]}
 
