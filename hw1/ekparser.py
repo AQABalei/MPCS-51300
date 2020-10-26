@@ -93,7 +93,8 @@ def p_statements(p):
 #       | ​<vdecl>​ "=" ​<exp>​ ";"
 #       | ​<exp>​ ";"
 #       | while "(" ​<exp>​ ")" ​<stmt>
-#       | if "(" ​<exp>​ ")" ​<stmt>​ (else ​<stmt>​)? | print ​<exp>​ ";"
+#       | if "(" ​<exp>​ ")" ​<stmt>​ (else ​<stmt>​)? 
+#       | print ​<exp>​ ";"
 #       | print ​<slit>​ ";"
 def p_blkStmt(p):
   '''stmt : blk'''
