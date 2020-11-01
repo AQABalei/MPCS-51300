@@ -12,7 +12,7 @@ def semanticsCheck(ast):
     refInitializationCheck(ast, errors)
     runFunctionExistCheck(ast, errors)
 
-    a = types(ast, knownFunctions)
+    # a = types(ast, knownFunctions)
     return errors
 
 # In ​ <vdecl>​ , the type may not be void.

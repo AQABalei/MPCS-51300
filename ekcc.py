@@ -2,6 +2,8 @@ import argparse
 import sys
 import ekparser
 import utils
+import constrains
+
 
 if __name__== "__main__":
   parser = argparse.ArgumentParser()
@@ -19,8 +21,9 @@ if __name__== "__main__":
   if not ast:
       raise RuntimeError('error: AST parsing failure')
       sys.exit(-1)
-  errors = analyzer.semanticsCheck(ast)
+  errors = constrains.semanticsCheck(ast)
   if args.boolean_emit_ast:
     utils.emitAst(args.source_file.rsplit('.', 1)[0] + '.ast.yaml', ast)
-
+  
+  print(errors)
   sys.exit(0)
