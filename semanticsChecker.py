@@ -144,32 +144,17 @@ def expTraversal(exp, knownVars, typeOfDeclaredFunctions):
             left = expTraversal(exp['lhs'], knownVars, typeOfDeclaredFunctions)
         if 'type' not in exp['rhs']:
             right = expTraversal(exp['rhs'], knownVars, typeOfDeclaredFunctions)
-
-        # check comparison first
+        
+        if exp['lhs']['type'] != exp['rhs']['type']:
+            raise RuntimeError('error: The types of a binary operator don’t match.')
+        
         if exp['op'] in ['eq', 'lt', 'gt', 'and', 'or']:
             exp['type'] = 'bool'
             return exp['type']
         else:
-            exp['type'] = checkType(exp['lhs'], exp['rhs'])
+            exp['type'] = exp['lhs']['type']
             return exp['type']
 
-# helper function, given lhs and rhs, return the type of exp
-def checkType(lhs, rhs):
-    # override the type of lit if possible
-    if lhs['type'] == 'float' or rhs['type'] == 'float':
-        lhs['type'] = 'float'
-        rhs['type'] = 'float'
-        return 'float'
-    elif lhs['type'] == 'cint' or rhs['type'] == 'cint':
-        lhs['type'] = 'cint'
-        rhs['type'] = 'cint'
-        return 'cint'
-    elif lhs['type'] == 'int' or rhs['type'] == 'int':
-        lhs['type'] = 'int'
-        rhs['type'] = 'int'
-        return 'int'
-    else:
-        raise RuntimeError('error: unknown type')
 
 # helper function, find all items with a specific key in dictionary
 def find(key, dictionary):
