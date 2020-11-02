@@ -165,10 +165,12 @@ def p_expBinOpUop(p):
 
 def p_expLit(p):
   '''exp : lit'''
-  if '.' in str(p[1]):
-    p[0] = {name: "flit", value: p[1]}
+  if 'false' in str(p[1]) or 'true' in str(p[1]):
+    p[0] = {name: "lit", typ: 'bool', value: p[1]}
+  elif '.' in str(p[1]):
+    p[0] = {name: "flit", typ: 'float', value: p[1]}
   else:
-    p[0] = {name: "lit", value: p[1]}
+    p[0] = {name: "lit", typ: 'int', value: p[1]}
 
 def p_expVarid(p):
   '''exp : varid'''
