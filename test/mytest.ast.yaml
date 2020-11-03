@@ -1,0 +1,64 @@
+funcs:
+  funcs:
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - exp:
+            name: lit
+            type: int
+            value: 1
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: int
+            var: $a
+        - cond:
+            name: lit
+            type: bool
+            value: 'true'
+          name: if
+          stmt:
+            contents:
+              contents:
+                name: stmts
+                stmts:
+                - exp:
+                    name: flit
+                    type: float
+                    value: 2.4
+                  name: vardeclstmt
+                  vdecl:
+                    node: vdecl
+                    type: float
+                    var: $a
+                - exp:
+                    lhs:
+                      name: varval
+                      type: float
+                      var: $a
+                    name: binop
+                    op: lt
+                    rhs:
+                      name: lit
+                      type: int
+                      value: 2
+                    type: bool
+                  name: expstmt
+              name: blk
+            name: blk
+            typeOfDeclaredVariable:
+              $a: float
+        - exp:
+            name: lit
+            type: int
+            value: 0
+          name: ret
+      name: blk
+      typeOfDeclaredVariable:
+        $a: int
+    globid: run
+    name: func
+    ret_type: int
+  name: funcs
+name: prog

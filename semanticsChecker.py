@@ -119,6 +119,8 @@ def expTraversal(exp, knownVars, typeOfDeclaredFunctions):
 
     # varid
     if exp['name'] == 'varval':
+        if exp['var'] not in knownVars:
+            raise RuntimeError('error: {} is not defined'.format(exp['var']))
         exp['type'] = knownVars[exp['var']]
         return exp['type']
 
