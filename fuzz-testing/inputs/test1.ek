@@ -4,16 +4,14 @@ def int fib (int $n) {
             return 0;
         else
             return 1;
-
+    
     int $a = fib ($n - 1);
     int $b = fib ($n - 2);
     return $a + $b;
 }
 
 def int run () {
-    print "fib(5):";
     int $val = fib(5);
-    print $val;
-
     return 0;
 }
+

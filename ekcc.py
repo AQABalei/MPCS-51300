@@ -7,6 +7,9 @@ import semanticsChecker
 
 def fuzztest(source_code):
     ast = ekparser.getAst(source_code)
+    if not ast:
+        print('no valid ast')
+        sys.exit(-1)
     semanticsChecker.check(ast)
 
 
@@ -21,7 +24,7 @@ def main():
     ast = ekparser.getAst(source_code)
 
     if not ast:
-        raise RuntimeError('error: AST parsing failure')
+        print('no valid ast')
         sys.exit(-1)
     
     # check semantic errors

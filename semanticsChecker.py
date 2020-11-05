@@ -5,14 +5,14 @@ def vdeclVoidCheck(ast):
     vdecls = list(find('vdecl', ast))
     for vdecl in vdecls:
         if vdecl['type'] == 'void':
-            raise RuntimeError('error: In <vdecl>, the type may not be void.')
+            raise TypeError('error: In <vdecl>, the type may not be void.')
 
 # In ​ ref ​ <type>​, the type may not be void or itself a reference type.
 def refVoidCheck(ast):
     types = list(find('types', ast)) + list(find('ret_type', ast)) + list(find('type', ast))
     for t in types:
         if 'ref' in t and 'void' in t:
-            raise RuntimeError('error: In <ref type> the type may not be void or itself a reference type.')
+            raise TypeError('error: In <ref type> the type may not be void or itself a reference type.')
 
 # All functions must be declared and/or defined before they are used.
 def functionOrderCheck(ast, typeOfDeclaredFunctions):
@@ -25,7 +25,7 @@ def functionOrderCheck(ast, typeOfDeclaredFunctions):
         globids = list(find('globid', func))
         for functionCall in globids:
             if functionCall not in typeOfDeclaredFunctions:
-                raise RuntimeError('error: All functions must be declared and/or defined before they are used.')
+                raise NameError('error: Cannot find function {}'.format(functionCall))
 
 # A function may not return a ref type.
 def funcitonRefTypeCheck(ast):
