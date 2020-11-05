@@ -5,7 +5,12 @@ import utils
 import semanticsChecker
 
 
-if __name__== "__main__":
+def fuzztest(source_code):
+    ast = ekparser.getAst(source_code)
+    semanticsChecker.check(ast)
+
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source_file', metavar='source_file', help='input file name')
     parser.add_argument('-emit-ast', action='store_true', default=False,
@@ -26,3 +31,6 @@ if __name__== "__main__":
         utils.emitAst(args.source_file.rsplit('.', 1)[0] + '.ast.yaml', ast)
 
     sys.exit(0)
+
+if __name__== "__main__":
+    main()

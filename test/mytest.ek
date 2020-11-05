@@ -1,8 +1,0 @@
-def int run() {
-    int $a = 1;
-    if (true) {
-        float $a = 2.4;
-        $a < 2;
-    }
-    return 0;
-}
