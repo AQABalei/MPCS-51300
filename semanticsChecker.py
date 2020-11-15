@@ -26,6 +26,8 @@ def functionOrderCheck(ast, typeOfDeclaredFunctions):
         for functionCall in globids:
             if functionCall not in typeOfDeclaredFunctions:
                 raise NameError('error: Cannot find function {}'.format(functionCall))
+    
+    ast['funcList'] = typeOfDeclaredFunctions
 
 # A function may not return a ref type.
 def funcitonRefTypeCheck(ast):
@@ -108,6 +110,8 @@ def stmtTraversal(stmt, typeOfDeclaredFunctions, typeOfDeclaredVariable):
 # function arguments can be void and what not, or strings
 def expTraversal(exp, knownVars, typeOfDeclaredFunctions):
     if 'type' in exp:
+        if exp['name'] == "caststmt":
+            expTraversal(exp['exp'], knownVars, typeOfDeclaredFunctions)
         return exp['type']
 
     # assignment
@@ -156,6 +160,7 @@ def expTraversal(exp, knownVars, typeOfDeclaredFunctions):
         else:
             exp['type'] = exp['lhs']['type']
             return exp['type']
+
 
 
 # helper function, find all items with a specific key in dictionary

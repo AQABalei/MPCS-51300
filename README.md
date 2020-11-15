@@ -8,6 +8,7 @@ Tianda Liu tliu77@uchicago.edu
 ## Requirements
     PyYAML 5.3.1: pip install PyYAML
     ply 3.11: pip install ply
+    llvmlite 0.34.0: pip install llvmlite
 
 ## References
     http://www.dabeaz.com/ply/ply.html

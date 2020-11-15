@@ -14,3 +14,10 @@ def emitAst(fileName, output):
   file = open(fileName, 'w')
   file.write(yaml)
   file.close()
+
+def emit_ir(fileName, module):
+  file = open(fileName, 'w')
+  file.write(
+      str(module)
+  )
+  file.close()
