@@ -1,8 +1,7 @@
 from llvmlite import ir
 import llvmlite.binding as llvm
-import strings as c
+import strings
 import copy
-from ctypes import CFUNCTYPE, c_int, c_float
 import llvm_binder
 
 # declare types
@@ -74,14 +73,6 @@ def getArg(module, sysArgs):
 
     for number, arg in enumerate(sysArgs):
         int_1 = ir.Constant(i32, arg)
-
-        #the million ifs
-    #     index_1 = ir.Constant(i32, number)
-
-    #     cond = builder.icmp_signed("==", value, index_1)
-    #     with builder.if_then(cond):
-    #         builder.ret(int_1)
-
         builder.insert_value(arr, int_1, number)
     builder.store(arr, ptr)
 
@@ -104,7 +95,7 @@ def getArgf(module, sysArgs):
 
     ptr = builder.alloca(array_type)
 
-    #function arguments (which is the index)
+    #function arguments
     index = func.args[0]
     ptr_arg = builder.alloca(i32)
     builder.store(index, ptr_arg)
@@ -126,10 +117,11 @@ def convert_func(ast, module, known_funcs):
     func_name = ast["globid"]
     symbols = {}
     symbols['cint'] = set()
-    symbols[c.cint_args] = {}
-    symbols[c.cint_args][func_name] = []
+    symbols[strings.cint_args] = {}
+    symbols[strings.cint_args][func_name] = []
 
     returnType = ir_type(ast['ret_type'])
+    
     # find arguments
     argument_types = list()
     args = ()
@@ -140,7 +132,7 @@ def convert_func(ast, module, known_funcs):
 
     fnty = ir.FunctionType(returnType, argument_types)
     func = ir.Function(module, fnty, name=func_name)
-    known_funcs[func_name] = (fnty, symbols[c.cint_args][func_name]) # add parameter info
+    known_funcs[func_name] = (fnty, symbols[strings.cint_args][func_name]) # add parameter info
     populate_known_funcs(symbols, known_funcs)
 
 
@@ -160,7 +152,7 @@ def convert_func(ast, module, known_funcs):
             builder.store(value, ptr)
 
     returned = pure_blk(ast["blk"], builder, symbols)
-    if ast[c.ret_type] == 'void':
+    if ast[strings.ret_type] == 'void':
         builder.ret_void()
         return fnty
     if not returned:
@@ -168,11 +160,11 @@ def convert_func(ast, module, known_funcs):
 
 
 def pure_blk(blk, builder, symbols):
-    if c.contents not in blk:
+    if strings.contents not in blk:
         return None
     legacy = copy.copy(symbols)
     returned = False
-    for statement in blk[c.contents][c.stmts]:
+    for statement in blk[strings.contents][strings.stmts]:
         returned = stmt(statement, builder, legacy) or returned
         if returned:
             return returned
@@ -181,10 +173,7 @@ def pure_blk(blk, builder, symbols):
 
 def populate_known_funcs(symbols, known_funcs):
     for name, t in known_funcs.items():
-        # symbols supposedly have IR objects as values
-        # This is not a problem since a function call does not depend on the IR objects
         symbols[name] = t[0]
-        symbols[c.cint_args][name] = t[1] # {"fib": [True, False]} if parameter is cint or not
 
 
 def vdecls(vdec, symbols, function_name):
@@ -192,18 +181,13 @@ def vdecls(vdec, symbols, function_name):
     variableList = list()
     args = list()
     for i in variables:
-        if "cint" in i["type"]:
-            symbols["cint"].add(i["var"])
-            symbols[c.cint_args][function_name].append(True)
-        else:
-            symbols[c.cint_args][function_name].append(False)
         variableList.append(ir_type(i["type"]))
         args.append(i["var"])
     return [variableList, args]
 
 
 def blk_stmt(stmt, builder, symbols):
-    return pure_blk(stmt[c.contents], builder, symbols)
+    return pure_blk(stmt[strings.contents], builder, symbols)
 
 
 def stmt(ast, builder, symbols):
@@ -212,7 +196,6 @@ def stmt(ast, builder, symbols):
         whileStmt(ast, builder, symbols)
 
     elif name == 'if':
-        # if_then makes own blocks
         return ifStmt(ast, builder, symbols)
 
     elif name == 'ret':
@@ -222,14 +205,12 @@ def stmt(ast, builder, symbols):
         vardeclstmt(ast, builder, symbols)
 
     elif name == 'expstmt':
-        # Don't make new block, because this stmt is just an exp
-        # stmt : exp Semicolon
-        expression(ast[c.exp], symbols, builder)
+        expression(ast[strings.exp], symbols, builder)
 
     elif name == 'blk':
         return blk_stmt(ast, builder, symbols)
 
-    elif name == c.printStmt:
+    elif name == strings.printStmt:
         print_number(ast, builder, symbols)
 
     elif name == 'printslit':
@@ -294,12 +275,12 @@ def whileStmt(ast, builder, symbols):
     w_after_block = builder.append_basic_block("w_after")
 
     # head
-    cond_head = expression(ast[c.cond], symbols, builder)
+    cond_head = expression(ast[strings.cond], symbols, builder)
     builder.cbranch(cond_head, w_body_block, w_after_block)
     # body
     builder.position_at_start(w_body_block)
     stmt(ast["stmt"], builder, symbols)
-    cond_body = expression(ast[c.cond], symbols, builder)
+    cond_body = expression(ast[strings.cond], symbols, builder)
     builder.cbranch(cond_body, w_body_block, w_after_block)
     # after
     builder.position_at_start(w_after_block)
@@ -339,24 +320,17 @@ def returnStmt(ast, builder, symbols):
 
 
 def vardeclstmt(ast, builder, symbols):
-    var_declaration = ast[c.vdecl]
-    var_type = var_declaration[c.typ]
-    var_name = var_declaration[c.var]
-    ####### inner variables clashes the outer ones
-    # if var_name in symbols:
-    #     raise RuntimeError(var_name + ' has already been defined')
+    var_declaration = ast[strings.vdecl]
+    var_type = var_declaration[strings.typ]
+    var_name = var_declaration[strings.var]
     if 'ref' in var_type:
         return ref_var_decl_stmt(ast, builder, symbols)
 
     vtype = to_ir_type(var_type)
     ptr = builder.alloca(vtype)
     symbols[var_name] = ptr
-    exp = ast[c.exp]
-    cint = False
-    if "cint" in ast[c.vdecl][c.typ]:
-        cint = True
-        symbols["cint"].add(var_name)
-    value = expression(exp, symbols, builder, cint = cint)
+    exp = ast[strings.exp]
+    value = expression(exp, symbols, builder)
     if value.type.is_pointer:
         value = builder.load(value)
 
@@ -375,10 +349,10 @@ def vardeclstmt(ast, builder, symbols):
 
 
 def ref_var_decl_stmt(ast, builder, symbols):
-    var_declaration = ast[c.vdecl]
-    var_type = var_declaration[c.typ]   # type checking for both side
-    var_name = var_declaration[c.var]
-    exp = ast[c.exp]
+    var_declaration = ast[strings.vdecl]
+    var_type = var_declaration[strings.typ]
+    var_name = var_declaration[strings.var]
+    exp = ast[strings.exp]
     pointee = expression(exp, symbols, builder)
     symbols[var_name] = pointee
 
@@ -400,9 +374,9 @@ def extract_value(exp, builder):
     return exp
 
 
-def binop(ast, symbols, builder, target_type, cint = False):
-    lhs = expression(ast["lhs"], symbols, builder, cint = cint)  ###some functions
-    rhs = expression(ast["rhs"], symbols, builder, cint = cint)  ###
+def binop(ast, symbols, builder, target_type):
+    lhs = expression(ast["lhs"], symbols, builder)
+    rhs = expression(ast["rhs"], symbols, builder)
     lhs = extract_value(lhs, builder)
     rhs = extract_value(rhs, builder)
     exp_type = target_type
@@ -438,8 +412,6 @@ def binop(ast, symbols, builder, target_type, cint = False):
                 lhs = binary_convert(builder, lhs)
                 rhs = binary_convert(builder, rhs)
             return builder.or_(lhs, rhs, name="or", flags = flags)
-        elif cint:
-            return check_int(lhs, rhs, builder, op)
         elif "int" in exp_type:
             if op == 'mul':
                 return builder.mul(lhs, rhs, name='mul')
@@ -542,19 +514,15 @@ class Error2147483648(Exception):
     pass
 
 
-def uop(ast, symbols, builder, cint=False):
+def uop(ast, symbols, builder):
     try:
-        uop_value = expression(ast["exp"], symbols, builder, cint, neg=True, exception=True)
+        uop_value = expression(ast["exp"], symbols, builder, neg=True, exception=True)
     except Error2147483648:
         return ir.Constant(i32, -2147483648)
     if uop_value.type.is_pointer:
         uop_value = builder.load(uop_value)
     if ast["type"] == "minus":
         if uop_value.type == i32:
-            if cint:
-                is_overflow = builder.icmp_signed('==', uop_value, ir.Constant(i32, -2147483648))
-                with builder.if_then(is_overflow):
-                    overflows(None, builder)
             return builder.neg(uop_value, name="Minus")
         else:
             f32_0 = ir.Constant(f32, 0)
@@ -569,37 +537,28 @@ def deference(builder, p):
     return p
 
 
-def expression(ast, symbols, builder, cint = False, neg=False, exception=False):
-    name = ast[c.name]
+def expression(ast, symbols, builder, neg=False, exception=False):
+    name = ast[strings.name]
     try:
-        if name == c.uop:
-            return uop(ast, symbols, builder, cint)
-        if name == c.litExp or name == "flit":
-            if cint:
-                limit = 2147483647
-                if neg:
-                    limit += 1
-                if ast['value'] > limit or ast['value'] < -2147483648:
-                    overflows(ast, builder)
-                if exception and ast['value'] == 2147483648:
-                    raise Error2147483648
-
+        if name == strings.uop:
+            return uop(ast, symbols, builder)
+        if name == strings.litExp or name == "flit":
             r = ir.Constant(to_ir_type(ast['type']), ast['value'])
             return r
-        if name == c.slitExp:
+        if name == strings.slitExp:
             return ast["value"]
             #raise RuntimeError('slit should never hit here')
-        if name == c.varExp:
-            id = ast[c.var]
+        if name == strings.varExp:
+            id = ast[strings.var]
             try:
                 # return builder.load(symbols[id])
                 return symbols[id]
             except TypeError as err:
                 raise RuntimeError('error parsing: ' + str(ast), err)
-        if name == c.funcCallExp:
-            function_name = ast[c.globid]
+        if name == strings.funcCallExp:
+            function_name = ast[strings.globid]
             fn = builder.module.globals.get(function_name)
-            params = ast[c.params]
+            params = ast[strings.params]
             parameters = []
             if function_name != "getarg" and function_name != "getargf":
                 parameters = prepare_parameters(function_name, symbols, params, builder)
@@ -608,35 +567,30 @@ def expression(ast, symbols, builder, cint = False, neg=False, exception=False):
                     deference(
                         builder,
                         expression(param, symbols, builder)
-                    ) for param in params[c.exps]
+                    ) for param in params[strings.exps]
                 ]
 
             return builder.call(fn, parameters)
-        if name == c.binop:
-            target_type = ast[c.typ]
-            return binop(ast, symbols, builder, target_type, cint = cint)
+        if name == strings.binop:
+            target_type = ast[strings.typ]
+            return binop(ast, symbols, builder, target_type)
 
-        if name == c.assign:
+        if name == strings.assign:
             var_name = ast["var"]
 
             if var_name not in symbols:
                 raise RuntimeError(f'{var_name} has not been defined')
 
             ptr = symbols[var_name]
-            if var_name in symbols["cint"]:
-                ast["type"] = "cint"
 
-            cint = False
-            if "cint" in ast["type"]:
-                cint = True
-            value = expression(ast["exp"], symbols, builder, cint = cint)
+            value = expression(ast["exp"], symbols, builder)
             store_helper(builder, ptr, value)
             return None
         
-        if name == c.caststmt:
+        if name == strings.caststmt:
             target_type = ir_type(ast["type"])
             source_type = ir_type(ast["exp"]["type"])
-            value = expression(ast["exp"], symbols, builder, cint = cint)
+            value = expression(ast["exp"], symbols, builder)
             if source_type == target_type:
                 return value
             else:
@@ -658,19 +612,18 @@ def prepare_parameters(function_name, symbols, params, builder):
     parameters = []
     if len(params) > 0:
         fnArgs = symbols[function_name].args
-        for index in range(len(params[c.exps])):
-            param = params[c.exps][index]
+        for index in range(len(params[strings.exps])):
+            param = params[strings.exps][index]
             argType = fnArgs[index]
             if argType.is_pointer:
-                if c.var not in param:
+                if strings.var not in param:
                     raise RuntimeError("non-variable object passed as ref type")
-                var_name = param[c.var]
+                var_name = param[strings.var]
                 parameters.append(
                     symbols[var_name]
                 )
             else:
-                cint = symbols[c.cint_args][function_name][index]
-                value = expression(param, symbols, builder, cint=cint)
+                value = expression(param, symbols, builder)
                 parameters.append(
                     deference(
                         builder,
@@ -700,7 +653,7 @@ def to_ir_type(_type):
     return ir_type(_type)
 
 def overflows(ast, builder):
-    ast = {"string": "Error: cint value overflowed", "name": "slit"}
+    ast = {"string": "Error: int value overflowed", "name": "slit"}
     printStmt(ast, builder, None)
 
 def convert_externs(ast, module, *sysArgs):
