@@ -1,5 +1,5 @@
 ; ModuleID = "prog"
-target triple = "unknown-unknown-unknown"
+target triple = "x86_64-apple-darwin19.6.0"
 target datalayout = ""
 
 define i32 @"getarg"(i32 %".1") 
@@ -29,12 +29,6 @@ entry:
 }
 
 declare i32 @"printf"(i8* %".1", ...) 
-
-declare void @"printString"(i8* %".1") 
-
-declare void @"printInt"(i32 %".1") 
-
-declare void @"printFloat"(float %".1") 
 
 define float @"test1"(float* %".1", float* %".2", float %".3") 
 {
@@ -117,26 +111,39 @@ entry:
   %".8" = alloca float
   %".9" = call float @"getargf"(i32 2)
   store float %".9", float* %".8"
-  %".11" = bitcast [8 x i8]* @"initial:" to i8*
-  call void @"printString"(i8* %".11")
+  %".11" = bitcast [11 x i8]* @"initial:" to i8*
+  %".12" = call i32 (i8*, ...) @"printf"(i8* %".11")
   %".13" = load float, float* %".2"
-  call void @"printFloat"(float %".13")
-  %".15" = load float, float* %".5"
-  call void @"printFloat"(float %".15")
-  %".17" = load float, float* %".8"
-  call void @"printFloat"(float %".17")
-  %".19" = load float, float* %".8"
-  %".20" = call float @"test1"(float* %".2", float* %".5", float %".19")
-  %".21" = bitcast [6 x i8]* @"final:" to i8*
-  call void @"printString"(i8* %".21")
-  %".23" = load float, float* %".2"
-  call void @"printFloat"(float %".23")
-  %".25" = load float, float* %".5"
-  call void @"printFloat"(float %".25")
-  %".27" = load float, float* %".8"
-  call void @"printFloat"(float %".27")
+  %".14" = fpext float %".13" to double
+  %".15" = bitcast [5 x i8]* @"double" to i8*
+  %".16" = call i32 (i8*, ...) @"printf"(i8* %".15", double %".14")
+  %".17" = load float, float* %".5"
+  %".18" = fpext float %".17" to double
+  %".19" = bitcast [5 x i8]* @"double" to i8*
+  %".20" = call i32 (i8*, ...) @"printf"(i8* %".19", double %".18")
+  %".21" = load float, float* %".8"
+  %".22" = fpext float %".21" to double
+  %".23" = bitcast [5 x i8]* @"double" to i8*
+  %".24" = call i32 (i8*, ...) @"printf"(i8* %".23", double %".22")
+  %".25" = load float, float* %".8"
+  %".26" = call float @"test1"(float* %".2", float* %".5", float %".25")
+  %".27" = bitcast [9 x i8]* @"final:" to i8*
+  %".28" = call i32 (i8*, ...) @"printf"(i8* %".27")
+  %".29" = load float, float* %".2"
+  %".30" = fpext float %".29" to double
+  %".31" = bitcast [5 x i8]* @"double" to i8*
+  %".32" = call i32 (i8*, ...) @"printf"(i8* %".31", double %".30")
+  %".33" = load float, float* %".5"
+  %".34" = fpext float %".33" to double
+  %".35" = bitcast [5 x i8]* @"double" to i8*
+  %".36" = call i32 (i8*, ...) @"printf"(i8* %".35", double %".34")
+  %".37" = load float, float* %".8"
+  %".38" = fpext float %".37" to double
+  %".39" = bitcast [5 x i8]* @"double" to i8*
+  %".40" = call i32 (i8*, ...) @"printf"(i8* %".39", double %".38")
   ret i32 0
 }
 
-@"initial:" = constant [8 x i8] c"initial:"
-@"final:" = constant [6 x i8] c"final:"
+@"initial:" = internal constant [11 x i8] c"initial: \0a\00"
+@"double" = internal constant [5 x i8] c"%f \0a\00"
+@"final:" = internal constant [9 x i8] c"final: \0a\00"

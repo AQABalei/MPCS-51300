@@ -9,7 +9,7 @@ def readFile(fileName):
   data = mMap[:].decode('ascii')
   return data
 
-def emitAst(fileName, output):
+def emit_ast(fileName, output):
   yaml = dump(output, default_flow_style=False)
   file = open(fileName, 'w')
   file.write(yaml)

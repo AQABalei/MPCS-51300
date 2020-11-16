@@ -2,7 +2,7 @@ from llvmlite import ir
 import llvmlite.binding as llvm
 import strings
 import copy
-import llvm_binder
+from ctypes import CFUNCTYPE, c_int, c_float
 
 # declare types
 i1 = ir.IntType(1)
@@ -64,7 +64,6 @@ def getArg(module, sysArgs):
 
     ptr = builder.alloca(array_type)
 
-    #function arguments (which is the index)
     index = func.args[0]
     ptr_arg = builder.alloca(i32)
     builder.store(index, ptr_arg)
@@ -114,19 +113,19 @@ def getArgf(module, sysArgs):
 
 
 def convert_func(ast, module, known_funcs):
-    func_name = ast["globid"]
+    func_name = ast[strings.globid]
     symbols = {}
     symbols['cint'] = set()
     symbols[strings.cint_args] = {}
     symbols[strings.cint_args][func_name] = []
 
-    returnType = ir_type(ast['ret_type'])
+    returnType = ir_type(ast[strings.ret_type])
     
     # find arguments
     argument_types = list()
     args = ()
-    if "vdecls" in ast:
-        funcArgs = vdecls(ast["vdecls"], symbols, func_name)
+    if strings.vdecls in ast:
+        funcArgs = vdecls(ast[strings.vdecls], symbols, func_name)
         argument_types = funcArgs[0]
         args = funcArgs[1]
 
@@ -151,7 +150,7 @@ def convert_func(ast, module, known_funcs):
             symbols[var_name] = ptr
             builder.store(value, ptr)
 
-    returned = pure_blk(ast["blk"], builder, symbols)
+    returned = pure_blk(ast[strings.blk], builder, symbols)
     if ast[strings.ret_type] == 'void':
         builder.ret_void()
         return fnty
@@ -469,12 +468,7 @@ def check_int(lhs, rhs, builder, op):
     if op == 'mul':
         result = builder.smul_with_overflow(lhs, rhs, name='mul')
     elif op == 'div':
-        # rhs = builder.uitofp(rhs, f32)
-        # rhs = builder.fdiv(ir.Constant(f32, 1), rhs, name="div")
-        # return check_int(lhs, rhs, builder, 'mul')
-
         a = builder.sdiv(lhs, rhs, name='div')
-
         l = builder.icmp_signed('==', lhs, ir.Constant(i32,-2147483648 ), name="eq")
         r = builder.icmp_signed('!=', rhs, ir.Constant(i32,-1), name="nq")
         cond = builder.mul(l, r, name='mul')
@@ -547,11 +541,9 @@ def expression(ast, symbols, builder, neg=False, exception=False):
             return r
         if name == strings.slitExp:
             return ast["value"]
-            #raise RuntimeError('slit should never hit here')
         if name == strings.varExp:
             id = ast[strings.var]
             try:
-                # return builder.load(symbols[id])
                 return symbols[id]
             except TypeError as err:
                 raise RuntimeError('error parsing: ' + str(ast), err)
@@ -576,21 +568,21 @@ def expression(ast, symbols, builder, neg=False, exception=False):
             return binop(ast, symbols, builder, target_type)
 
         if name == strings.assign:
-            var_name = ast["var"]
+            var_name = ast[strings.var]
 
             if var_name not in symbols:
                 raise RuntimeError(f'{var_name} has not been defined')
 
             ptr = symbols[var_name]
 
-            value = expression(ast["exp"], symbols, builder)
+            value = expression(ast[strings.exp], symbols, builder)
             store_helper(builder, ptr, value)
             return None
         
         if name == strings.caststmt:
-            target_type = ir_type(ast["type"])
-            source_type = ir_type(ast["exp"]["type"])
-            value = expression(ast["exp"], symbols, builder)
+            target_type = ir_type(ast[strings.typ])
+            source_type = ir_type(ast[strings.exp][strings.typ])
+            value = expression(ast[strings.exp], symbols, builder)
             if source_type == target_type:
                 return value
             else:
@@ -657,23 +649,23 @@ def overflows(ast, builder):
     printStmt(ast, builder, None)
 
 def convert_externs(ast, module, *sysArgs):
-    externList = ast["externs"]
+    externList = ast[strings.externs]
     for i in externList:
         convert_extern(i, module, *sysArgs)
 
 
 def convert_funcs(ast, module, known_funcs):
-    funcList = ast['funcs']
+    funcList = ast[strings.funcs]
     for i in funcList:
         convert_func(i, module, known_funcs)
 
 
 def convert(ast, module, *sysArgs):
-    if "externs" in ast:
-        convert_externs(ast["externs"], module, *sysArgs)
-    known_funcs = ast['funcList']
+    if strings.externs in ast:
+        convert_externs(ast[strings.externs], module, *sysArgs)
+    known_funcs = ast["funcList"]
     declare_print_function(module, known_funcs)
-    convert_funcs(ast["funcs"], module, known_funcs)
+    convert_funcs(ast[strings.funcs], module, known_funcs)
 
 
 def declare_print_function(module, known_funcs):
@@ -693,3 +685,17 @@ def mainFunc(ast, *args):
     module.triple = llvm.get_default_triple()
     convert(ast, module, *args)
     return module
+
+# -jit handler
+def llvm_bind(module, *args, optimize = False):
+    llvm_ir_parsed = llvm.parse_assembly(str(module))
+    llvm_ir_parsed.verify()
+
+    target_machine = llvm.Target.from_default_triple().create_target_machine()
+    engine = llvm.create_mcjit_compiler(llvm_ir_parsed, target_machine)
+    engine.finalize_object()
+    entry = engine.get_function_address("run")
+    cfunc = CFUNCTYPE(c_int)(entry)
+    result = cfunc()
+    print("\nprogram returns: {}".format(result))
+    return llvm_ir_parsed

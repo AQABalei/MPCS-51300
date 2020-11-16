@@ -3,8 +3,7 @@ import sys
 import ekparser
 import utils
 import semanticsChecker
-import IR
-import llvm_binder
+import ir
 
 def fuzztest(source_code):
     ast = ekparser.getAst(source_code)
@@ -20,14 +19,14 @@ def main():
     parser.add_argument('-emit-ast', action='store_true', default=False,
                         dest='boolean_emit_ast', help='generate ast and save as yaml file')
 
-    parser.add_argument('-emit-llvm', action='store_true',
+    parser.add_argument('-emit-ir', action='store_true',
                     default=False,
-                    dest='boolean_emit_llvm',
-                    help='generate ast')
+                    dest='boolean_emit_ir',
+                    help='generate ir')
     parser.add_argument('-jit', action='store_true',
-                default=False,
-                dest='boolean_jit',
-                help='generate ast'),
+                    default=False,
+                    dest='boolean_jit',
+                    help='generate ast')
     parser.add_argument('sysarg', nargs='*')
     args = parser.parse_args()
 
@@ -42,15 +41,16 @@ def main():
     semanticsChecker.check(ast)
 
     if args.boolean_emit_ast:
-        utils.emitAst(args.source_file.rsplit('.', 1)[0] + '.ast.yaml', ast)
+        utils.emit_ast(args.source_file.rsplit('.', 1)[0] + '.ast.yaml', ast)
     
-    module = IR.mainFunc(ast, args.sysarg)
+    #assignment 3
+    module = ir.mainFunc(ast, args.sysarg)
 
-    if args.boolean_emit_llvm:
+    if args.boolean_emit_ir:
         utils.emit_ir(args.source_file.rsplit('.', 1)[0] + '.ll', module)
 
     if args.boolean_jit:
-        module = llvm_binder.bind(module, args.sysarg, optimize = False)
+        module = ir.llvm_bind(module, args.sysarg, optimize = False)
 
     sys.exit(0)
 

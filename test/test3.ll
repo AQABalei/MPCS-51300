@@ -1,14 +1,8 @@
 ; ModuleID = "prog"
-target triple = "unknown-unknown-unknown"
+target triple = "x86_64-apple-darwin19.6.0"
 target datalayout = ""
 
 declare i32 @"printf"(i8* %".1", ...) 
-
-declare void @"printString"(i8* %".1") 
-
-declare void @"printInt"(i32 %".1") 
-
-declare void @"printFloat"(float %".1") 
 
 define i32 @"run"() 
 {
@@ -28,16 +22,16 @@ entry:
   %"and" = and i1 %"gt", %"lt"
   br i1 %"and", label %"entry.if", label %"entry.else"
 entry.if:
-  %".13" = bitcast [5 x i8]* @"In If" to i8*
-  call void @"printString"(i8* %".13")
+  %".13" = bitcast [8 x i8]* @"In If" to i8*
+  %".14" = call i32 (i8*, ...) @"printf"(i8* %".13")
   br label %"entry.endif"
 entry.else:
-  %".16" = bitcast [9 x i8]* @"Not in if" to i8*
-  call void @"printString"(i8* %".16")
+  %".16" = bitcast [12 x i8]* @"Not in if" to i8*
+  %".17" = call i32 (i8*, ...) @"printf"(i8* %".16")
   br label %"entry.endif"
 entry.endif:
   ret i32 0
 }
 
-@"In If" = constant [5 x i8] c"In If"
-@"Not in if" = constant [9 x i8] c"Not in if"
+@"In If" = internal constant [8 x i8] c"In If \0a\00"
+@"Not in if" = internal constant [12 x i8] c"Not in if \0a\00"
