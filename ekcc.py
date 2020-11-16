@@ -28,10 +28,6 @@ def main():
                 default=False,
                 dest='boolean_jit',
                 help='generate ast'),
-    parser.add_argument('-o', action='store',
-                    dest='output_file',
-                    help='output file name',
-                    required=False)
     parser.add_argument('sysarg', nargs='*')
     args = parser.parse_args()
 
@@ -51,7 +47,7 @@ def main():
     module = IR.mainFunc(ast, args.sysarg)
 
     if args.boolean_emit_llvm:
-        utils.emit_ir(args.output_file.rsplit('.', 1)[0] + '.ll', module)
+        utils.emit_ir(args.source_file.rsplit('.', 1)[0] + '.ll', module)
 
     if args.boolean_jit:
         module = llvm_binder.bind(module, args.sysarg, optimize = False)

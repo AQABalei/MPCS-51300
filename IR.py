@@ -5,14 +5,16 @@ import copy
 from ctypes import CFUNCTYPE, c_int, c_float
 import llvm_binder
 
-
-llvm.initialize()
-llvm.initialize_native_target()
-llvm.initialize_native_asmprinter()
-
-i32 = ir.IntType(32)
+# declare types
 i1 = ir.IntType(1)
+i32 = ir.IntType(32)
 f32 = ir.FloatType()
+
+def initialize():
+    # Initialize llvm
+    llvm.initialize()
+    llvm.initialize_native_target()
+    llvm.initialize_native_asmprinter()
 
 
 def ir_type(string):
@@ -29,7 +31,7 @@ def ir_type(string):
     return ir.VoidType()
 
 
-def externs(extern, module, *sysArgs):
+def convert_extern(extern, module, *sysArgs):
     returnType = ir_type(extern["ret_type"])
 
     args = list()
@@ -45,11 +47,11 @@ def externs(extern, module, *sysArgs):
         pass
 
     else:
-        fnty = ir.FunctionType(returnType, args)  # func = ir.Function(module, functionType, name = i["globid"] )
+        fnty = ir.FunctionType(returnType, args)
         func = ir.Function(module, fnty, name=extern["globid"])
 
 
-def getArg(module,  sysArgs):
+def getArg(module, sysArgs):
     sysArgs = [
         int(float(value)) for value in sysArgs
     ]
@@ -120,7 +122,7 @@ def getArgf(module, sysArgs):
     builder.ret(builder.load(address))
 
 
-def funcs(ast, module, known_funcs):
+def convert_func(ast, module, known_funcs):
     func_name = ast["globid"]
     symbols = {}
     symbols['cint'] = set()
@@ -228,85 +230,60 @@ def stmt(ast, builder, symbols):
         return blk_stmt(ast, builder, symbols)
 
     elif name == c.printStmt:
-        printStmt(ast, builder, symbols)
+        print_number(ast, builder, symbols)
 
     elif name == 'printslit':
-        printSlit(ast, builder, symbols)
+        print_slit(ast, builder, symbols)
 
     else:
         raise RuntimeError('this is not processed: ' + str(ast))
 
 
-def convert_to_string(builder, ir_object):
-    if ir_object.type == f32:
-        fn = builder.module.globals.get('floatToString')
-        return builder.call(fn, [ir_object])
-    else:
-        fn = builder.module.globals.get('intToString')
-        return builder.call(fn, [ir_object])
+def print_number(ast, builder, symbols):
+    '''
+    print i1, i32, f32
+    note: the floar need to be converted to double when using printf
+    '''
+    value = expression(ast["exp"], symbols, builder)
+    if value.type.is_pointer:
+        value = builder.load(value)
+    if value.type == i1:
+        value = builder.zext(value, i32)
+    if value.type == f32:
+        value = builder.fpext(value, ir.DoubleType())
+    voidptr_ty = ir.IntType(8).as_pointer()
+    fmt = "%i \n\0" if value.type == i32 else "%f \n\0"
+    c_fmt = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt)), bytearray(fmt.encode("utf8")))
+    global_fmt = get_global_format(builder, str(value.type), c_fmt)
+    fmt_arg = builder.bitcast(global_fmt, voidptr_ty)
+    fn = builder.module.globals.get('printf')
+    builder.call(fn, [fmt_arg, value])
 
 
-def print_pointer_number(ir_pointer, builder):
-    print_numbers(builder.load(ir_pointer), builder)
-
-
-def print_numbers(ir_object, builder):
-    if ir_object.type.is_pointer:
-        return print_pointer_number(ir_object, builder)
-
-    if ir_object.type == f32:
-        fn = builder.module.globals.get('printFloat')
-    else:
-        fn = builder.module.globals.get('printInt')
-        if ir_object.type == i1:
-            ir_object = builder.zext(ir_object, i32)
-    builder.call(fn, [ir_object])
-
-
-def printSlit(ast, builder, symbols):
-    s = ast['string']
-    if len(s) == 0:
+def print_slit(ast, builder, symbols):
+    '''
+    print string with printf
+    note: string need 
+    '''
+    string = ast['string']
+    if len(string) == 0:
         return None
-    b = s.encode('ascii')
-    b = bytearray(b)
-
-    s_bytes = ir.Constant(ir.ArrayType(ir.IntType(8), len(b)), b)
-
-    #finds the global variables
-    global_fmt = find_global_constant(builder, s, s_bytes)
-    ptr_fmt = builder.bitcast(global_fmt, ir.IntType(8).as_pointer())
-    fn = builder.module.globals.get('printString')
-    builder.call(fn, [ptr_fmt])
-
-#printf
-def printStmt(ast, builder, symbols):
-    #adapted from tutorial https://github.com/cea-sec/miasm/blob/master/miasm2/jitter/llvmconvert.py
-    #but I know how it works and can explain it
-    s = expression(ast["exp"], symbols, builder)
-    if not isinstance(s, str):
-        return print_numbers(s, builder)
-    # else:
-    #     if len(s) == 0:
-    #         return None
-    #     b = s.encode('ascii')
-    #     b = bytearray(b)
-
-    #     s_bytes = ir.Constant(ir.ArrayType(ir.IntType(8), len(b)), b)
-
-    #     #finds the global variables
-    #     global_fmt = find_global_constant(builder, s, s_bytes)
-    #     ptr_fmt = builder.bitcast(global_fmt, ir.IntType(8).as_pointer())
-    # fn = builder.module.globals.get('printString')
-    # builder.call(fn, [ptr_fmt])
+    voidptr_ty = ir.IntType(8).as_pointer()
+    fmt = string + " \n\0"
+    c_fmt = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt)), bytearray(fmt.encode("utf8")))
+    global_fmt = get_global_format(builder, string, c_fmt)
+    fmt_arg = builder.bitcast(global_fmt, voidptr_ty)
+    fn = builder.module.globals.get('printf')
+    builder.call(fn, [fmt_arg])
 
 
-#make the global variable or find it
-def find_global_constant(builder,name, value):
-    #adapted from tutorial https://github.com/cea-sec/miasm/blob/master/miasm2/jitter/llvmconvert.py
+def get_global_format(builder, name, value):
     if name in builder.module.globals:
         return builder.module.globals[name]
     else:
+        # code from https://blog.usejournal.com/writing-your-own-programming-language-and-compiler-with-python-a468970ae6df
         glob = ir.GlobalVariable(builder.module, value.type, name = name)
+        glob.linkage = 'internal'
         glob.global_constant = True
         glob.initializer = value
         return glob
@@ -354,9 +331,7 @@ def returnStmt(ast, builder, symbols):
     if "exp" in ast:
         ret_exp = expression(ast["exp"], symbols, builder)
         if ret_exp.type.is_pointer:
-            return builder.ret(
-                builder.load(ret_exp)
-            )
+            return builder.ret(builder.load(ret_exp))
         builder.ret(ret_exp)
     else:
         builder.ret_void()
@@ -408,15 +383,6 @@ def ref_var_decl_stmt(ast, builder, symbols):
     symbols[var_name] = pointee
 
 
-# def binary_convert(builder, i1, target_type):
-#     if i1.type == ir.IntType(1):
-#         i1 = builder.uitofp(i1, f32)
-#     if i1.type == f32:
-#         i1 = builder.fptosi(i1, target_type)
-#     if i1.type.is_pointer:
-#         i1 = builder.load(i1)
-#     return i1
-
 def binary_convert(builder, il):
     if il.type.is_pointer:
         il = builder.load(il)
@@ -444,7 +410,7 @@ def binop(ast, symbols, builder, target_type, cint = False):
 
 
     if lhs.type != i1 and rhs.type != i1:
-        if op != "logAnd" and op != "logOr":
+        if op != "and" and op != "or":
             if "float" in exp_type:
                 if lhs.type != f32:
                     lhs = builder.uitofp(lhs, f32)
@@ -462,16 +428,16 @@ def binop(ast, symbols, builder, target_type, cint = False):
         flags= ["fast"]
 
     try:
-        if op == "logAnd":
+        if op == "and":
             if lhs.type != rhs.type:
                 lhs = binary_convert(builder, lhs)
                 rhs = binary_convert(builder, rhs)
-            return builder.and_(lhs, rhs, name="logAnd", flags = flags)
-        elif op == "logOr":
+            return builder.and_(lhs, rhs, name="and", flags = flags)
+        elif op == "or":
             if lhs.type != rhs.type:
                 lhs = binary_convert(builder, lhs)
                 rhs = binary_convert(builder, rhs)
-            return builder.or_(lhs, rhs, name="logOr", flags = flags)
+            return builder.or_(lhs, rhs, name="or", flags = flags)
         elif cint:
             return check_int(lhs, rhs, builder, op)
         elif "int" in exp_type:
@@ -734,59 +700,43 @@ def to_ir_type(_type):
     return ir_type(_type)
 
 def overflows(ast, builder):
-    overf = {"exp":
-                 {"value": "Error: cint value overflowed", "name": "slit"}
-             }
-    printStmt(overf, builder, None)
-
-    pass
+    ast = {"string": "Error: cint value overflowed", "name": "slit"}
+    printStmt(ast, builder, None)
 
 def convert_externs(ast, module, *sysArgs):
     externList = ast["externs"]
     for i in externList:
-        externs(i, module, *sysArgs)
+        convert_extern(i, module, *sysArgs)
 
 
 def convert_funcs(ast, module, known_funcs):
     funcList = ast['funcs']
     for i in funcList:
-        funcs(i, module, known_funcs)
+        convert_func(i, module, known_funcs)
 
 
 def convert(ast, module, *sysArgs):
     if "externs" in ast:
-    #     # does all the extern functions
         convert_externs(ast["externs"], module, *sysArgs)
-    # moved funcs and externs into separate functions so that known_funcs could be passed from the prog level to funcs
     known_funcs = ast['funcList']
-
-    define_built_ins(module, known_funcs)
-
+    declare_print_function(module, known_funcs)
     convert_funcs(ast["funcs"], module, known_funcs)
 
-    #########
-    #### make printf function
-    ####code from  https://github.com/cea-sec/miasm/blob/master/miasm2/jitter/llvmconvert.py
-    #### search for printf to find it easier
 
-
-def define_built_ins(module, known_funcs):
-    char_pointer = ir.IntType(8).as_pointer()
-    fnty = ir.FunctionType(ir.IntType(32), [char_pointer], var_arg=True)
+def declare_print_function(module, known_funcs):
+    '''
+    Declare printf function
+    Code from https://blog.usejournal.com/writing-your-own-programming-language-and-compiler-with-python-a468970ae6df
+    '''
+    voidptr_ty = ir.IntType(8).as_pointer()
+    fnty = ir.FunctionType(ir.IntType(32), [voidptr_ty], var_arg=True)
     printf = ir.Function(module, fnty, name="printf")
     known_funcs["printf"] = "slit"
-    fnty = ir.FunctionType(ir.VoidType(), [char_pointer])
-    ir.Function(module, fnty, name="printString")
-    fnty = ir.FunctionType(ir.VoidType(), [i32])
-    ir.Function(module, fnty, name="printInt")
-    fnty = ir.FunctionType(ir.VoidType(), [f32])
-    ir.Function(module, fnty, name="printFloat")
 
 
 def mainFunc(ast, *args):
+    initialize()
     module = ir.Module(name="prog")
+    module.triple = llvm.get_default_triple()
     convert(ast, module, *args)
-    # print(module)
-
-    
     return module
