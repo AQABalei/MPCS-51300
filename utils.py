@@ -1,7 +1,7 @@
 from yaml import dump
 import mmap
 
-def readFile(fileName):
+def read_file(fileName):
   f = open(fileName,"r")
   mMap = mmap.mmap(f.fileno(),0, prot = mmap.PROT_READ)
   stringFile =str(mMap[:])

@@ -3,7 +3,7 @@ import sys
 import ekparser
 import utils
 import semanticsChecker
-import ir
+import codegen
 
 def fuzztest(source_code):
     ast = ekparser.getAst(source_code)
@@ -18,39 +18,37 @@ def main():
     parser.add_argument('source_file', metavar='source_file', help='input file name')
     parser.add_argument('-emit-ast', action='store_true', default=False,
                         dest='boolean_emit_ast', help='generate ast and save as yaml file')
-
-    parser.add_argument('-emit-ir', action='store_true',
-                    default=False,
-                    dest='boolean_emit_ir',
-                    help='generate ir')
-    parser.add_argument('-jit', action='store_true',
-                    default=False,
-                    dest='boolean_jit',
-                    help='generate ast')
+    parser.add_argument('-emit-llvm', action='store_true', default=False,
+                        dest='boolean_emit_llvm', help='generate ir')
+    parser.add_argument('-jit', action='store_true', default=False,
+                        dest='boolean_jit', help='generate ast')
     parser.add_argument('sysarg', nargs='*')
     args = parser.parse_args()
 
-    source_code = utils.readFile(args.source_file)
+    # generate ast
+    source_code = utils.read_file(args.source_file)
     ast = ekparser.getAst(source_code)
 
     if not ast:
-        print('no valid ast')
-        sys.exit(-1)
+        raise RuntimeError('error: no valid ast')
     
     # check semantic errors
     semanticsChecker.check(ast)
 
+    # save ast to file
     if args.boolean_emit_ast:
         utils.emit_ast(args.source_file.rsplit('.', 1)[0] + '.ast.yaml', ast)
     
-    #assignment 3
-    module = ir.mainFunc(ast, args.sysarg)
+    # generate ir
+    module = codegen.generate_ir(ast, args.sysarg)
 
-    if args.boolean_emit_ir:
+    # save ir to file
+    if args.boolean_emit_llvm:
         utils.emit_ir(args.source_file.rsplit('.', 1)[0] + '.ll', module)
-
+    
+    # jit compiler
     if args.boolean_jit:
-        module = ir.llvm_bind(module, args.sysarg, optimize = False)
+        module = codegen.execute(module, args.sysarg, optimize = False)
 
     sys.exit(0)
 
