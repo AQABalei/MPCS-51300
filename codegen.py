@@ -527,10 +527,43 @@ def ir_type(string):
     return ir.VoidType()
 
 # jit compiler
-def execute(module, *args, optimize = False):
+def execute(module, optimization, *args):
     llvm_ir_parsed = llvm.parse_assembly(str(module))
-    llvm_ir_parsed.verify()
 
+    if optimization:
+        # initialize pass manager builder
+        pmb = llvm.PassManagerBuilder()
+        pmb.opt_level = 3
+
+        # initialize module pass manager
+        pm = llvm.ModulePassManager()
+        pmb.populate(pm)
+
+        # add optimization passes
+        pm.add_constant_merge_pass()
+        pm.add_dead_arg_elimination_pass()
+        pm.add_function_attrs_pass()
+        pm.add_function_inlining_pass(200) # threshold = 200
+        pm.add_global_dce_pass()
+        pm.add_global_optimizer_pass()
+        pm.add_ipsccp_pass()
+        pm.add_dead_code_elimination_pass()
+        pm.add_cfg_simplification_pass()   
+        pm.add_gvn_pass()
+        pm.add_instruction_combining_pass()
+        pm.add_licm_pass()
+        pm.add_sccp_pass()
+        pm.add_sroa_pass()
+        pm.add_type_based_alias_analysis_pass()
+        pm.add_basic_alias_analysis_pass()
+
+        # run optimization passes on the module
+        is_modified = pm.run(llvm_ir_parsed)
+
+        # check if the optimizations made any modification to the module
+        print("Optimizations made modification to the module: ", is_modified)
+
+    llvm_ir_parsed.verify()
     target_machine = llvm.Target.from_default_triple().create_target_machine()
     engine = llvm.create_mcjit_compiler(llvm_ir_parsed, target_machine)
     engine.finalize_object()

@@ -22,6 +22,8 @@ def main():
                         dest='boolean_emit_llvm', help='generate ir')
     parser.add_argument('-jit', action='store_true', default=False,
                         dest='boolean_jit', help='generate ast')
+    parser.add_argument('-O)', action='store_true', help='optimization mode',
+                        dest='optimization', required=False)
     parser.add_argument('sysarg', nargs='*')
     args = parser.parse_args()
 
@@ -48,7 +50,7 @@ def main():
     
     # jit compiler
     if args.boolean_jit:
-        module = codegen.execute(module, args.sysarg, optimize = False)
+        module = codegen.execute(module, args.optimization, args.sysarg)
 
     sys.exit(0)
 
