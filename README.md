@@ -4,12 +4,13 @@
     Tianda Liu <tliu77@uchicago.edu>
 
 ## Usage
-    python ekcc.py [-emit-ast -emit-llvm -jit] <input_file> [args]
+    python ekcc.py [-emit-ast -emit-llvm -jit -O] <input_file> [args]
     
-    -emit-ast will save ast to <input_file_name>.yaml
-    -emit-llvm will save ir to <input_file_name>.ll
-    -jit will execute the source code directly and print results to console
-    [args] allows you to pass arguments to source code
+    -emit-ast:  save ast to <input_file_name>.yaml
+    -emit-llvm: save ir to <input_file_name>.ll
+    -jit:       execute the source code directly and print results to console
+    -O:         optimization mode
+    [args]      pass arguments to source code
 ## Requirements
     Python >= 3.6
     PyYAML 5.3.1: pip install PyYAML
