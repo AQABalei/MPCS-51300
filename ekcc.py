@@ -50,7 +50,7 @@ def main():
     
     # jit compiler
     if args.boolean_jit:
-        module = codegen.execute(module, args.optimization, args.sysarg)
+        module = codegen.execute(module, args.optimization)
 
     sys.exit(0)
 

@@ -527,13 +527,17 @@ def ir_type(string):
     return ir.VoidType()
 
 # jit compiler
-def execute(module, optimization, *args):
-    llvm_ir_parsed = llvm.parse_assembly(str(module))
+def execute(module, optimization):
+    parsed_module = llvm.parse_assembly(str(module))
 
     if optimization:
         # initialize pass manager builder
         pmb = llvm.PassManagerBuilder()
         pmb.opt_level = 3
+
+        # initialize function pass manager
+        fpm = llvm.create_function_pass_manager(parsed_module)
+        pmb.populate(fpm)
 
         # initialize module pass manager
         pm = llvm.ModulePassManager()
@@ -558,17 +562,17 @@ def execute(module, optimization, *args):
         pm.add_basic_alias_analysis_pass()
 
         # run optimization passes on the module
-        is_modified = pm.run(llvm_ir_parsed)
+        is_modified = pm.run(parsed_module)
 
         # check if the optimizations made any modification to the module
         print("Optimizations made modification to the module: ", is_modified)
 
-    llvm_ir_parsed.verify()
+    parsed_module.verify()
     target_machine = llvm.Target.from_default_triple().create_target_machine()
-    engine = llvm.create_mcjit_compiler(llvm_ir_parsed, target_machine)
+    engine = llvm.create_mcjit_compiler(parsed_module, target_machine)
     engine.finalize_object()
     entry = engine.get_function_address("run")
     cfunc = CFUNCTYPE(c_int)(entry)
     result = cfunc()
     print("\nexit: {}".format(result))
-    return llvm_ir_parsed
+    return parsed_module
