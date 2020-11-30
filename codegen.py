@@ -114,29 +114,35 @@ def declare_built_int_functions(module, func_name, sys_args):
 def convert_func(ast, module, known_funcs):
     func_name = ast[strings.globid]
     symbols = {}
+    symbols['cint'] = set()
+    symbols[strings.cint_args] = {}
+    symbols[strings.cint_args][func_name] = []
 
     returnType = ir_type(ast[strings.ret_type])
     
     # add arguments to list, check noalias attributes
     if strings.vdecls in ast:
-        argument_types, argument_names, is_noalias = parse_vdecls(ast[strings.vdecls])
+        argument_types, argument_names, is_noalias = parse_vdecls(ast[strings.vdecls], symbols, func_name)
     else:
         argument_types, argument_names, is_noalias = [], [], []
     
     # declare function
     fnty = ir.FunctionType(returnType, argument_types)
     func = ir.Function(module, fnty, name=func_name)
+    known_funcs[func_name] = (fnty, symbols[strings.cint_args][func_name])
 
     # add entry
     entry = func.append_basic_block('entry')
     builder = ir.IRBuilder(entry)
 
     # add parameter info
-    known_funcs[func_name] = (fnty, []) # (fnty, symbols[strings.cint_args][func_name])
+    known_funcs[func_name] = (fnty, symbols[strings.cint_args][func_name])
+
     # populate known funcs
     for name, t in known_funcs.items():
         symbols[name] = t[0]
-    
+        symbols[strings.cint_args][name] = t[1]
+
     # go through arguments
     for index, argument in enumerate(func.args):
         if is_noalias[index]:
@@ -152,7 +158,6 @@ def convert_func(ast, module, known_funcs):
             symbols[var_name] = ptr
             builder.store(argument, ptr)
     
-
     returned = blk(ast[strings.blk], builder, symbols)
     if ast[strings.ret_type] == 'void':
         builder.ret_void()
@@ -160,9 +165,15 @@ def convert_func(ast, module, known_funcs):
     if not returned:
         raise RuntimeError("function missing return statement")
 
-def parse_vdecls(ast):
+def parse_vdecls(ast, symbols, func_name):
     type_list, name_list, is_noalias = [], [], []
+
     for var in ast["vars"]:
+        if "cint" in var[strings.typ]:
+            symbols["cint"].add(var["var"])
+            symbols[strings.cint_args][func_name].append(True)
+        else:
+            symbols[strings.cint_args][func_name].append(False)
         type_list.append(ir_type(var["type"]))
         name_list.append(var["var"])
         is_noalias.append("noalias" in var["type"])
@@ -309,11 +320,14 @@ def vardeclstmt(ast, builder, symbols):
     vtype = ir_type(var_type)
     ptr = builder.alloca(vtype)
     symbols[var_name] = ptr
-
+    cint = False
     # assign value to variable
+    if "cint" in ast[strings.vdecl][strings.typ]:
+        cint = True
+        symbols["cint"].add(var_name)
     if "exp" in ast:
         exp = ast[strings.exp]
-        value = expression(exp, symbols, builder)
+        value = expression(exp, symbols, builder, cint = cint)
         value = get_value(value, builder)
 
         if vtype != value.type:
@@ -339,16 +353,24 @@ def ref_var_decl(ast, builder, symbols):
     pointee = expression(exp, symbols, builder)
     symbols[var_name] = pointee
 
-def expression(ast, symbols, builder, neg=False, exception=False):
+def expression(ast, symbols, builder, neg=False, exception=False, cint=False):
     name = ast[strings.name]
     try:
-        if name == 'uop':
-            return uop(ast, symbols, builder)
-        elif name == 'lit' or name == "flit":
-            return ir.Constant(ir_type(ast['type']), ast['value'])
+        if name == strings.uop:
+            return uop(ast, symbols, builder, cint)
+        if name == strings.litExp or name == "flit":
+            if cint:
+                limit = 2147483647
+                if neg:
+                    limit += 1
+                if ast['value'] > limit or ast['value'] < -2147483648:
+                    overflows(ast, builder)
+                if exception and ast['value'] == 2147483648:
+                    raise Error2147483648
+            return ir.Constant(ir_type(ast[strings.typ]), ast['value'])
         elif name == 'slit':
-            return ast["value"]
-        elif name == 'varval':
+            return ast['value']
+        elif name == strings.varExp:
             name = ast[strings.var]
             try:
                 return symbols[name]
@@ -369,11 +391,11 @@ def expression(ast, symbols, builder, neg=False, exception=False):
                 parameters = prepare_parameters(func_name, params, symbols, builder)
 
             return builder.call(fn, parameters)
-        elif name == 'binop':
+        elif name == strings.binop:
             target_type = ast[strings.typ]
-            return binop(ast, symbols, builder, target_type)
+            return binop(ast, symbols, builder, target_type, cint = cint)
 
-        elif name == 'assign':
+        elif name == strings.assign:
             var_name = ast[strings.var]
 
             if var_name not in symbols:
@@ -381,11 +403,18 @@ def expression(ast, symbols, builder, neg=False, exception=False):
 
             ptr = symbols[var_name]
 
-            value = expression(ast[strings.exp], symbols, builder)
+            if var_name in symbols["cint"]:
+                ast[strings.typ] = "cint"
+
+            cint = False
+            if "cint" in ast["type"]:
+                cint = True
+
+            value = expression(ast[strings.exp], symbols, builder, cint = cint)
             assign_value(builder, ptr, value)
             return
         
-        elif name == 'caststmt':
+        elif name == strings.caststmt:
             target_type = ir_type(ast[strings.typ])
             source_type = ir_type(ast[strings.exp][strings.typ])
             value = expression(ast[strings.exp], symbols, builder)
@@ -411,15 +440,17 @@ def get_value(exp, builder):
         return builder.load(exp)
     return exp
 
-def binop(ast, symbols, builder, target_type):
-    lhs = expression(ast["lhs"], symbols, builder)
+def binop(ast, symbols, builder, target_type, cint = False):
+    lhs = expression(ast["lhs"], symbols, builder, cint = cint)
     lhs = get_value(lhs, builder)
-    rhs = expression(ast["rhs"], symbols, builder)
+    rhs = expression(ast["rhs"], symbols, builder, cint = cint)
     rhs = get_value(rhs, builder)
     op = ast["op"]
     flags= ["fast"]
 
     try:
+        if cint:
+            return check_int(lhs, rhs, builder, op)
         if op == "and":
             return builder.and_(lhs, rhs, name="and", flags=())
         elif op == "or":
@@ -461,15 +492,23 @@ def binop(ast, symbols, builder, target_type):
                 pass
         else:
             raise RuntimeError('error: ast is not processed: ' + str(ast))
-    except:
-        raise RuntimeError('error: cannot processing ast: ' + str(ast), err)
+    except error as e:
+        print(e)
+        raise RuntimeError('error: cannot processing ast: ' + str(ast))
 
-def uop(ast, symbols, builder):
-    uop_value = expression(ast["exp"], symbols, builder, neg=True, exception=True)
+def uop(ast, symbols, builder, cint = False):
+    try:
+        uop_value = expression(ast["exp"], symbols, builder, neg=True, exception=True, cint = cint)
+    except Error2147483648:
+        return ir.Constant(i32, -2147483648)
 
     uop_value = get_value(uop_value, builder)
-    if ast["type"] == "minus":
+    if ast["op"] == "minus":
         if uop_value.type == i32:
+            if cint:
+                is_overflow = builder.icmp_signed('==', uop_value, ir.Constant(i32, -2147483648))
+                with builder.if_then(is_overflow):
+                    overflows(None, builder)
             return builder.neg(uop_value, name="Minus")
         else:
             f32_0 = ir.Constant(f32, 0)
@@ -494,7 +533,8 @@ def prepare_parameters(func_name, params, symbols, builder):
                 symbols[var_name]
             )
         else:
-            value = expression(param, symbols, builder)
+            cint = symbols[strings.cint_args][func_name][i]
+            value = expression(param, symbols, builder, cint = cint)
             value = get_value(value, builder)
             parameters.append(value)
     return parameters
@@ -525,6 +565,57 @@ def ir_type(string):
     if "bool" in string:
         return i1
     return ir.VoidType()
+
+def check_int(lhs, rhs, builder, op):
+    result = None
+    if op == 'mul':
+        result = builder.smul_with_overflow(lhs, rhs, name='mul')
+    elif op == 'div':
+        a = builder.sdiv(lhs, rhs, name='div')
+
+        l = builder.icmp_signed('==', lhs, ir.Constant(i32,-2147483648), name="eq")
+        r = builder.icmp_signed('!=', rhs, ir.Constant(i32,-1), name="nq")
+        cond = builder.mul(l, r, name='mul')
+
+        with builder.if_else(cond) as (then, otherwise):
+            with then:
+                print("INININ")
+                overflows(None, builder)
+            with otherwise:
+                print("BAD")
+                lhs = check_int(lhs, ir.Constant(i32, -1), builder, 'mul')
+                rhs = check_int(rhs, ir.Constant(i32, -1), builder, 'mul')
+        return a
+
+    elif op == 'add':
+        result = builder.sadd_with_overflow(lhs, rhs, name="add")
+    elif op == 'sub':
+        result = builder.ssub_with_overflow(lhs, rhs, name='sub')
+    
+    if result is not None:
+        is_overflow = builder.extract_value(result, 1)
+
+        with builder.if_then(is_overflow):
+            overflows(None, builder)
+
+
+        return builder.extract_value(result, 0)
+
+
+    if op == 'eq':
+        return builder.icmp_signed('==', lhs, rhs, name="eq")
+    elif op == 'lt':
+        return builder.icmp_signed('<', lhs, rhs, name="lt")
+    elif op == 'gt':
+        return builder.icmp_signed('>', lhs, rhs, name="gt")
+
+class Error2147483648(Exception):
+    pass
+
+def overflows(ast, builder):
+    print("CALLED:", ast)
+    message = {"string": "Error: cint value overflowed", "name": "slit"}
+    print_slit(message, builder, None)
 
 # jit compiler
 def execute(module, optimization):
