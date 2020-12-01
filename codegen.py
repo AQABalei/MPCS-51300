@@ -578,13 +578,7 @@ def check_int(lhs, rhs, builder, op):
         cond = builder.and_(l, r, name='and')
         cond2 = builder.or_(cond, rIsZero, name='or')
         with builder.if_then(cond2):
-            # with then:
-            #     print("INININ")
             overflows(None, builder)
-            # with otherwise:
-            #     print("BAD")
-            #     lhs = check_int(lhs, ir.Constant(i32, -1), builder, 'mul')
-            #     rhs = check_int(rhs, ir.Constant(i32, -1), builder, 'mul')
         a = builder.sdiv(lhs, rhs, name='div')
         return a
 
