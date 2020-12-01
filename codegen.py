@@ -492,8 +492,7 @@ def binop(ast, symbols, builder, target_type, cint = False):
                 pass
         else:
             raise RuntimeError('error: ast is not processed: ' + str(ast))
-    except error as e:
-        print(e)
+    except:
         raise RuntimeError('error: cannot processing ast: ' + str(ast))
 
 def uop(ast, symbols, builder, cint = False):
@@ -571,20 +570,22 @@ def check_int(lhs, rhs, builder, op):
     if op == 'mul':
         result = builder.smul_with_overflow(lhs, rhs, name='mul')
     elif op == 'div':
-        a = builder.sdiv(lhs, rhs, name='div')
+        
 
         l = builder.icmp_signed('==', lhs, ir.Constant(i32,-2147483648), name="eq")
-        r = builder.icmp_signed('!=', rhs, ir.Constant(i32,-1), name="nq")
-        cond = builder.mul(l, r, name='mul')
-
-        with builder.if_else(cond) as (then, otherwise):
-            with then:
-                print("INININ")
-                overflows(None, builder)
-            with otherwise:
-                print("BAD")
-                lhs = check_int(lhs, ir.Constant(i32, -1), builder, 'mul')
-                rhs = check_int(rhs, ir.Constant(i32, -1), builder, 'mul')
+        r = builder.icmp_signed('==', rhs, ir.Constant(i32,-1), name="eq")
+        rIsZero = builder.icmp_signed('==', rhs, ir.Constant(i32,0), name="eq")
+        cond = builder.and_(l, r, name='and')
+        cond2 = builder.or_(cond, rIsZero, name='or')
+        with builder.if_then(cond2):
+            # with then:
+            #     print("INININ")
+            overflows(None, builder)
+            # with otherwise:
+            #     print("BAD")
+            #     lhs = check_int(lhs, ir.Constant(i32, -1), builder, 'mul')
+            #     rhs = check_int(rhs, ir.Constant(i32, -1), builder, 'mul')
+        a = builder.sdiv(lhs, rhs, name='div')
         return a
 
     elif op == 'add':
@@ -613,7 +614,6 @@ class Error2147483648(Exception):
     pass
 
 def overflows(ast, builder):
-    print("CALLED:", ast)
     message = {"string": "Error: cint value overflowed", "name": "slit"}
     print_slit(message, builder, None)
 

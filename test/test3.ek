@@ -1,6 +1,6 @@
 def int run () {
   cint $a = -2147483648;
-  cint $b = 1;
+  cint $b = -1;
 
   cint $c = $a / $b;
   print $c;
